@@ -203,6 +203,7 @@ namespace GlobalSearch {
     m_jobID                      = other.m_jobID;
     m_currentOptStep             = other.m_currentOptStep;
     m_failCount                  = other.m_failCount;
+    m_fixCount                   = other.m_fixCount;
     m_parents                    = other.m_parents;
     m_dupString                  = other.m_dupString;
     m_rempath                    = other.m_rempath;
@@ -247,9 +248,11 @@ namespace GlobalSearch {
     settings->setValue("jobID", getJobID());
     settings->setValue("currentOptStep", getCurrentOptStep());
     settings->setValue("parents", getParents());
+    settings->setValue("dupString", getDuplicateString());
     settings->setValue("rempath", getRempath());
     settings->setValue("status", int(getStatus()));
     settings->setValue("failCount", getFailCount());
+    settings->setValue("fixCount", getFixCount());
     settings->setValue("startTime", getOptTimerStart().toString());
     settings->setValue("endTime", getOptTimerEnd().toString());
 
@@ -335,7 +338,9 @@ namespace GlobalSearch {
       setRank(           settings->value("rank",           0).toInt());
       setJobID(          settings->value("jobID",          0).toInt());
       setCurrentOptStep( settings->value("currentOptStep", 0).toInt());
+      setDuplicateString(settings->value("dupString",      "").toString());
       setFailCount(      settings->value("failCount",      0).toInt());
+      setFixCount(       settings->value("fixCount",      0).toInt());
       setParents(        settings->value("parents",        "").toString());
       setRempath(        settings->value("rempath",        "").toString());
       setStatus(   State(settings->value("status",         -1).toInt()));
@@ -651,7 +656,11 @@ namespace GlobalSearch {
       status = "Killed";
       break;
     case Duplicate:
-      status = "Duplicate";
+      status = "Duplicate of %1";
+      break;
+    //ZF
+    case InteratomicDist:
+      status = "IAD";
       break;
     case Error:
       status = "Error";
@@ -1166,6 +1175,10 @@ namespace GlobalSearch {
       }
       if (line.contains("Status:") && strl.size() > 1) {
         setStatus( Structure::State((strl.at(1)).toInt() ));
+      }
+      // ZF
+      if (line.contains("fixCount:") && strl.size() > 1) {
+        setFixCount((strl.at(1)).toUInt());
       }
       if (line.contains("failCount:") && strl.size() > 1) {
         setFailCount((strl.at(1)).toUInt());

@@ -221,8 +221,8 @@ namespace GlobalSearch {
      * @param run Number of running structures
      * @param fail Number of failing structures
      */
-    void updateStatus(int opt, int run, int fail) {
-      emit sig_updateStatus(opt,run,fail);};
+    void updateStatus(int opt, int iad, int run, int fail) {
+      emit sig_updateStatus(opt,iad,run,fail);};
 
     /**
      * Update the cached Avogadro::GLWidget pointer
@@ -356,7 +356,7 @@ namespace GlobalSearch {
      * appropriate thread.
      * @sa updateStatus
      */
-    void updateStatus_(int, int, int);
+    void updateStatus_(int, int, int, int);
 
     /**
      * Hidden call. Ensures that the GUI is modified from the
@@ -465,7 +465,7 @@ namespace GlobalSearch {
      * appropriate thread.
      * @sa updateStatus
      */
-    void sig_updateStatus(int,int,int);
+    void sig_updateStatus(int,int,int,int);
 
     /**
      * Hidden call. Ensures that the GUI is modified from the
@@ -575,6 +575,13 @@ namespace GlobalSearch {
      */
     QPushButton *ui_push_resume;
 
+    /**
+     * Pointer to GUI element. Do not use in derived class code.
+     * @note This must be set up in the derived-constructor. See class
+     * description.
+     */
+    QLabel *ui_label_iad;
+    
     /**
      * Pointer to GUI element. Do not use in derived class code.
      * @note This must be set up in the derived-constructor. See class

@@ -98,6 +98,8 @@ namespace XtalOpt {
     Ui::Tab_Plot ui;
     QReadWriteLock *m_plot_mutex;
     Avogadro::PlotObject *m_plotObject;
+    Avogadro::PlotObject *z_plotObject;
+    Avogadro::PlotObject *d_plotObject;
   };
 }
 

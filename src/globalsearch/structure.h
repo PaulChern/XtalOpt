@@ -137,7 +137,12 @@ namespace GlobalSearch {
       Duplicate,
       /** The Structure is about to restart it's current optimization
        * step. */
-      Restart
+      Restart,
+
+      // ZF
+      InteratomicDist
+      /** The Structure has two atoms that are too close to one another
+       * not consdiered for parent pool but will still fully optimize */
     };
 
     /** Whether the Structure has an enthalpy value set.
@@ -197,6 +202,13 @@ namespace GlobalSearch {
      * @sa getEnergy
      */
     double getPV()	const {return m_PV;};
+
+    //
+    //
+    int getFixCount() const {return m_fixCount;};
+    
+    void setFixCount( int fixCount) {m_fixCount = fixCount;};
+
 
     /** Returns an energetic ranking set by setRank(uint).
      * @return the energetic ranking.
@@ -1070,7 +1082,7 @@ namespace GlobalSearch {
     /// \cond
     bool m_hasEnthalpy, m_updatedSinceDupChecked;
     bool m_histogramGenerationPending;
-    uint m_generation, m_id, m_rank, m_jobID, m_currentOptStep, m_failCount;
+    uint m_generation, m_id, m_rank, m_jobID, m_currentOptStep, m_failCount, m_fixCount;
     QString m_parents, m_dupString, m_rempath;
     double m_enthalpy, m_PV;
     State m_status;

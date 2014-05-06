@@ -23,6 +23,11 @@
 #include <xtalopt/ui/dialog.h>
 #include <xtalopt/genetic.h>
 
+#include <avogadro/primitive.h>
+#include <avogadro/molecule.h>
+#include <avogadro/atom.h>
+
+#include <globalsearch/obeigenconv.h>
 #include <globalsearch/optbase.h>
 #include <globalsearch/optimizer.h>
 #include <globalsearch/queueinterface.h>
@@ -37,6 +42,14 @@
 #include <globalsearch/queueinterfaces/remote.h>
 #endif // ENABLE_SSH
 
+#include <Eigen/LU>
+
+#include <openbabel/generic.h>
+#include <openbabel/forcefield.h>
+
+#include <QtCore/QRegExp>
+#include <QtCore/QStringList>
+#include <QtCore/QSettings>
 #include <QtCore/QDir>
 #include <QtCore/QList>
 #include <QtCore/QFile>
@@ -49,9 +62,11 @@
 
 #define ANGSTROM_TO_BOHR 1.889725989
 
+using namespace std;
 using namespace GlobalSearch;
 using namespace OpenBabel;
 using namespace Avogadro;
+using namespace Eigen;
 
 namespace XtalOpt {
 
@@ -395,15 +410,15 @@ namespace XtalOpt {
   {
     INIT_RANDOM_GENERATOR();
     // Set cell parameters
-    double a            = RANDDOUBLE() * (a_max-a_min) + a_min;
-    double b            = RANDDOUBLE() * (b_max-b_min) + b_min;
-    double c            = RANDDOUBLE() * (c_max-c_min) + c_min;
+    double A            = RANDDOUBLE() * (a_max-a_min) + a_min;
+    double B            = RANDDOUBLE() * (b_max-b_min) + b_min;
+    double C            = RANDDOUBLE() * (c_max-c_min) + c_min;
     double alpha        = RANDDOUBLE() * (alpha_max - alpha_min) + alpha_min;
     double beta         = RANDDOUBLE() * (beta_max  - beta_min ) + beta_min;
     double gamma        = RANDDOUBLE() * (gamma_max - gamma_min) + gamma_min;
 
     // Create crystal
-    Xtal *xtal	= new Xtal(a, b, c, alpha, beta, gamma);
+    Xtal *xtal	= new Xtal(A, B, C, alpha, beta, gamma);
     QWriteLocker locker (xtal->lock());
 
     xtal->setStatus(Xtal::Empty);
@@ -415,30 +430,224 @@ namespace XtalOpt {
     QList<uint> atomicNums = comp.keys();
     // Sort atomic number by decreasing minimum radius. Adding the "larger"
     // atoms first encourages a more even (and ordered) distribution
-    for (int i = 0; i < atomicNums.size()-1; ++i) {
-      for (int j = i + 1; j < atomicNums.size(); ++j) {
-        if (this->comp.value(atomicNums[i]).minRadius <
-            this->comp.value(atomicNums[j]).minRadius) {
-          atomicNums.swap(i,j);
+    if (using_customIAD){
+        for (int i = 0; i < atomicNums.size()-1; ++i) {
+            for (int j = i + 1; j < atomicNums.size(); ++j) {
+               if (this->interComp.value(qMakePair<int, int>(atomicNums[i], atomicNums[i])).minIAD >
+                        this->interComp.value(qMakePair<int, int>(atomicNums[j], atomicNums[j])).minIAD) {
+                    atomicNums.swap(i,j);
+                }
+            }
         }
-      }
+    } else {
+        for (int i = 0; i < atomicNums.size()-1; ++i) {
+            for (int j = i + 1; j < atomicNums.size(); ++j) {
+                if (this->comp.value(atomicNums[i]).minRadius <
+                        this->comp.value(atomicNums[j]).minRadius) {
+                    atomicNums.swap(i,j);
+                }
+            }
+        }   
     }
+
+    bool cellDivideAllowed = false;
+    int counter = 0;
+//    int badCounter = 0;
+    int cellDivisions = 0;
+    unsigned int quant = 0;
+
+    if (using_cellDivide){
+    /*    for (int k = 0; k <= atomicNums.size(); ++k) {
+            if (this->comp.value(atomicNums[k]).quantity >= quant) {
+                quant = this->comp.value(atomicNums[k]).quantity;
+            }
+        }
+        
+        --quant;
+*/
+        // Iterates through the list of elements to determine the number of subcells
+        for (int j = 20; j >= 2; --j) {
+            for (int i = 0; i <= atomicNums.size(); ++i) {
+                // Can have an uneven stoichiometry?
+                /*if (this->comp.value(atomicNums[i]).quantity % j > 3) {
+                    badCounter = 0;
+                    counter = 0;
+                    break;
+                } else if (this->comp.value(atomicNums[i]).quantity % j == 0){
+                    counter++;
+                } else {
+                    badCounter++;
+                    counter++;
+                }
+                if (badCounter == atomicNums.size()) {
+                    counter = 0;
+                    badCounter = 0;
+                    break;
+                }
+                if (counter == atomicNums.size() && badCounter != atomicNums.size()){
+                    cellDivideAllowed = true;
+                    cellDivisions = j;
+                    break;
+                }
+*/
+                if (this->comp.value(atomicNums[i]).quantity % j != 0) {
+                    counter = 0;
+                    break;
+                } else {
+                    counter++;
+                }
+                
+                if (counter == atomicNums.size()) {
+                    cellDivideAllowed = true;
+                    cellDivisions = j;
+                    break;
+                }
+
+            }
+            if (cellDivideAllowed) break;
+        }
+    }
+    qDebug() << "Xtal has cellDivisions=" << cellDivisions;
 
     unsigned int atomicNum;
     unsigned int q;
-    for (int num_idx = 0; num_idx < atomicNums.size(); num_idx++) {
-      atomicNum = atomicNums.at(num_idx);
-      q = comp.value(atomicNum).quantity;
-      for (uint i = 0; i < q; i++) {
-        if (!xtal->addAtomRandomly(atomicNum, this->comp)) {
-          xtal->deleteLater();
-          debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
-                "specified interatomic distance.");
-          return 0;
+    
+    // ZF
+    // Niggli reduction may work better here...?
+    if (using_cellDivide){
+        //  Unit Cell Vectors has whole number multiples
+        int a, b, c;
+        a=b=c=1;
+        if (cellDivideAllowed && cellDivisions<=20) {
+            if (cellDivisions==1 || cellDivisions==2 || cellDivisions==3 || cellDivisions==5 || cellDivisions==7){
+                a = cellDivisions;
+            } else if (cellDivisions%2==0 || cellDivisions%3==0 
+                    || cellDivisions%4==0 || cellDivisions%5==0 
+                    || cellDivisions%6==0 || cellDivisions%7==0 
+                    || cellDivisions%8==0 || cellDivisions%9==0) {
+                // cellDivisions is not prime!
+                if (cellDivisions%2==0) {
+                    if (cellDivisions/2>1) {
+                        if ((cellDivisions/2)%2==0) {
+                            a = (cellDivisions/2)/2;
+                            b = 2;
+                            c = 2;
+                        } else if ((cellDivisions/2)%3==0) {
+                            a = (cellDivisions/2)/3;
+                            b = 2;
+                            c = 3;
+                        } else {
+                            a = cellDivisions/2;
+                            b = 2;
+                        }
+                    } else {
+                        a = 2;
+                    }
+                } else if(cellDivisions%3==0) {
+                     if (cellDivisions/3>1) {
+                        if ((cellDivisions/3)%2==0) {
+                            a = (cellDivisions/3)/2;
+                            b = 2;
+                            c = 3;
+                        } else if ((cellDivisions/3)%3==0) {
+                            a = (cellDivisions/3)/3;
+                            b = 3;
+                            c = 3;
+                        } else {
+                            a = cellDivisions/3;
+                            b = 3;
+                        }
+                    } else {
+                        a = 3;
+                    }
+                }
+            } else {
+                // cellDivisions is prime...all in a row
+                a = cellDivisions;
+            }
         }
-      }
-    }
 
+        A = xtal->getA() / a; 
+        B = xtal->getB() / b; 
+        C = xtal->getC() / c; 
+        
+        if (using_cellDivide){
+            xtal->setCellInfo(A,
+                    B,
+                    C,
+                    xtal->getAlpha(),
+                    xtal->getBeta(),
+                    xtal->getGamma());
+            qDebug() << "Xtal cell dimensions are decreasing from a=" << A*a << "b=" << B*b << "c=" << C*c <<
+                    "to a=" << A << "b=" << B << "c=" << C;
+
+        }
+
+        for (int num_idx = 0; num_idx < atomicNums.size(); num_idx++) {
+            atomicNum = atomicNums.at(num_idx);
+            q = comp.value(atomicNum).quantity;
+            if (cellDivideAllowed){
+                //Check for uneven Stoichiometry
+                    if (q % cellDivisions != 0) {
+                        q = q/cellDivisions;
+                        if (q < 1) {
+                            q = 1;
+                        }
+                    } else {
+                        q = q / cellDivisions;
+                    }
+                for (uint i = 0; i < q; i++) {
+                    if (using_customIAD){
+                        if (!xtal->addAtomRandomlyIAD(atomicNum, this->comp, this->interComp, maxRadius, 1000)) {
+                            xtal->deleteLater();
+                            debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
+                                "specified custom interatomic distance.");
+                            return 0;
+                        }
+                    }  else {
+                        if (!xtal->addAtomRandomly(atomicNum, this->comp)) {
+                            xtal->deleteLater();
+                            debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
+                                "specified interatomic distance.");
+                            return 0;
+                        }
+                    }
+                }
+            } 
+        }
+
+        if (!xtal->fillSuperCell(a, b, c, xtal)) {
+            xtal->deleteLater();
+            debug("XtalOpt::generateRandomXtal: Failed to add atoms.");
+            return 0;
+        }
+
+        //checkCount(xtal);
+
+    } else {
+        for (int num_idx = 0; num_idx < atomicNums.size(); num_idx++) {
+            atomicNum = atomicNums.at(num_idx);
+            q = comp.value(atomicNum).quantity;
+            for (uint i = 0; i < q; i++) {
+            // ZF
+                if (using_customIAD){
+                    if (!xtal->addAtomRandomlyIAD(atomicNum, this-> comp, this->interComp, maxRadius, 1000)) {
+                        xtal->deleteLater();
+                        debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
+                            "specified custom interatomic distance.");
+                        return 0;
+                    }
+                }  else {
+                    if (!xtal->addAtomRandomly(atomicNum, this->comp)) {
+                        xtal->deleteLater();
+                        debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
+                            "specified interatomic distance.");
+                        return 0;
+                    }
+                }
+            }
+        } 
+    } 
     // Set up geneology info
     xtal->setGeneration(generation);
     xtal->setIDNumber(id);
@@ -766,6 +975,90 @@ namespace XtalOpt {
     return true;
   }
 
+//ZF
+// Fixing this to allow different stoichiometries
+  bool XtalOpt::checkCount(Xtal *xtal, QString * err) {
+    if (!xtal) {
+      if (err != NULL) {
+        *err = "Xtal pointer is NULL.";
+      }
+      return false;
+    }
+
+    // Lock xtal
+    //QWriteLocker locker (xtal->lock());
+
+    if (xtal->getStatus() == Xtal::Empty) {
+      if (err != NULL) {
+        *err = "Xtal status is empty.";
+      }
+      return false;
+    }
+
+    // Check composition
+    QList<unsigned int> atomTypes = comp.keys();
+    QList<unsigned int> atomCounts;
+#if QT_VERSION >= 0x040700
+    atomCounts.reserve(atomTypes.size());
+#endif // QT_VERSION
+    for (int i = 0; i < atomTypes.size(); ++i) {
+      atomCounts.append(0);
+    }
+    // Count atoms of each type
+    for (int i = 0; i < xtal->numAtoms(); ++i) {
+      int typeIndex = atomTypes.indexOf(
+            static_cast<unsigned int>(xtal->atom(i)->atomicNumber()));
+      // Type not found:
+      if (typeIndex == -1) {
+        qDebug() << "XtalOpt::checkXtal: Composition incorrect.";
+        if (err != NULL) {
+          *err = "Bad composition.";
+        }
+        return false;
+      }
+      ++atomCounts[typeIndex];
+    }
+    // Check counts
+    QList<Atom*> atomList = xtal->atoms();
+    for (int i = 0; i < atomTypes.size(); ++i) {
+        if (atomCounts[i] != comp[atomTypes[i]].quantity) {
+            // Incorrect count:
+            while (atomCounts[i] > comp[atomTypes[i]].quantity) {
+                int random = rand() % 10;
+                if (i == atomTypes.indexOf(static_cast<unsigned int>(xtal->atom(random)->atomicNumber()))) {
+                    xtal->removeAtom(atomList.at(random));
+                    qDebug() << "XtalOpt::checkXtal: Removed an atom.";
+                }
+            }
+            while (atomCounts[i] < comp[atomTypes[i]].quantity) {
+                    if (using_customIAD){
+                        if (!xtal->addAtomRandomlyIAD(i, this->comp, this->interComp, maxRadius, 1000)) {
+                            xtal->deleteLater();
+                            debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
+                                "specified custom interatomic distance.");
+                            return 0;
+                        }
+                    }  else {
+                        if (!xtal->addAtomRandomly(i, this->comp)) {
+                            xtal->deleteLater();
+                            debug("XtalOpt::generateRandomXtal: Failed to add atoms with "
+                                "specified interatomic distance.");
+                            return 0;
+                        }
+                    }
+            }
+        }
+    }
+
+    // Xtal is OK!
+    if (err != NULL) {
+      *err = "";
+    }
+    return true;
+  }
+// 
+//
+
   bool XtalOpt::checkXtal(Xtal *xtal, QString * err) {
     if (!xtal) {
       if (err != NULL) {
@@ -932,11 +1225,158 @@ namespace XtalOpt {
       }
     }
 
+    //ZF
+    if (using_customIAD) {
+      int atom1, atom2;
+      double IAD;
+      if (!xtal->checkMinIAD(this->interComp, &atom1, &atom2, &IAD)){
+        Atom *a1 = xtal->atom(atom1);
+        Atom *a2 = xtal->atom(atom2);
+        const double minIAD =
+            this->interComp.value(qMakePair<int, int>(a1->atomicNumber(), a2->atomicNumber())).minIAD;
+        xtal->setStatus(Xtal::InteratomicDist);
+        qDebug() << "Discarding structure -- Bad IAD ("
+                 << IAD << " < "
+                 << minIAD << ")";
+        if (err != NULL) {
+          *err = "Two atoms are too close together.";
+        }
+        return false;
+      }
+    }
+
     // Xtal is OK!
     if (err != NULL) {
       *err = "";
     }
     return true;
+  }
+
+  bool XtalOpt::checkStepOptimizedStructure(Structure *s, QString *err) {
+                                           
+        Xtal *xtal = qobject_cast<Xtal*>(s);
+        uint totalOptSteps = m_optimizer->getNumberOfOptSteps();
+        uint currOptStep = xtal->getCurrentOptStep();
+        uint fixCount = xtal->getFixCount();
+
+        if (xtal == NULL) {
+            return true;
+        }
+
+        //Check post-opt
+        if (totalOptSteps == currOptStep) {
+            if (using_customIAD) {
+                int atom1, atom2;
+                double IAD;
+                if (!xtal->checkMinIAD(this->interComp, &atom1, &atom2, &IAD)){
+                    Atom *a1 = xtal->atom(atom1);
+                    Atom *a2 = xtal->atom(atom2);
+
+                    const double minIAD =
+                        this->interComp.value(qMakePair<int, int>(a1->atomicNumber(), a2->atomicNumber())).minIAD;
+                    xtal->setStatus(Xtal::InteratomicDist);
+
+                    qDebug() << "Discarding structure -- Bad IAD ("
+                        << IAD << " < "
+                        << minIAD << ")";
+                    if (err != NULL) {
+                        *err = "Two atoms are too close together before finishing all opt steps.";        
+                    }
+                    return false;
+                }
+                return true;
+            }
+        
+            if (using_interatomicDistanceLimit) {
+                int atom1, atom2;
+                double IAD;
+                if (!xtal->checkInteratomicDistances(this->comp, &atom1, &atom2, &IAD)){
+                    Atom *a1 = xtal->atom(atom1);
+                    Atom *a2 = xtal->atom(atom2);
+                    const double minIAD =
+                        this->comp.value(a1->atomicNumber()).minRadius +
+                        this->comp.value(a2->atomicNumber()).minRadius;
+
+                    qDebug() << "Discarding structure -- Bad IAD ("
+                         << IAD << " < "
+                         << minIAD << ")";
+                    if (err != NULL) {
+                        *err = "Two atoms are too close together.";
+                    }
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        if (using_checkStepOpt){
+            if (using_customIAD) {
+                int atom1, atom2;
+                double IAD;
+                for (int i=0; i < 100; ++i) {
+                    if (!xtal->checkMinIAD(this->interComp, &atom1, &atom2, &IAD)){
+                        Atom *a1 = xtal->atom(atom1);
+                        Atom *a2 = xtal->atom(atom2);
+                    
+                        if (fixCount < 10) {
+                            int atomicNumber = (a2)->atomicNumber();  
+                            Atom **atom = &a2;
+                            if (xtal->moveAtomRandomlyIAD(atomicNumber, this->comp, this->interComp, maxRadius, 9999, atom)) {
+                                continue;
+                            } else {
+                                const double minIAD =
+                                        this->interComp.value(qMakePair<int, int>(a1->atomicNumber(), atomicNumber)).minIAD;
+                                        s->setStatus(Xtal::InteratomicDist);
+
+                                qDebug() << "Discarding structure -- Bad IAD ("
+                                        << IAD << " < "
+                                        << minIAD << ") \n Could not fix the IAD issue.";        
+                                return false;
+                            }
+                        } else {
+                            const double minIAD =
+                                    this->interComp.value(qMakePair<int, int>(a1->atomicNumber(), a2->atomicNumber())).minIAD;
+                                    s->setStatus(Xtal::InteratomicDist);
+
+                            qDebug() << "Discarding structure -- Bad IAD ("
+                                    << IAD << " < "
+                                    << minIAD << ") \n Exceeded the number of fixes.";        
+                            return false;
+                        }
+                    } else {
+                        if (i>0) {
+                            s->setFixCount(fixCount + 1);
+                            s->setCurrentOptStep(0);
+                            break;
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                return true;
+            }
+              
+            if (using_interatomicDistanceLimit) {
+                int atom1, atom2;
+                double IAD;
+                if (!xtal->checkInteratomicDistances(this->comp, &atom1, &atom2, &IAD)){
+                    Atom *a1 = xtal->atom(atom1);
+                    Atom *a2 = xtal->atom(atom2);
+                    const double minIAD =
+                        this->comp.value(a1->atomicNumber()).minRadius +
+                        this->comp.value(a2->atomicNumber()).minRadius;
+
+                    qDebug() << "Discarding structure -- Bad IAD ("
+                         << IAD << " < "
+                         << minIAD << ")";
+                    if (err != NULL) {
+                        *err = "Two atoms are too close together.";
+                    }
+                    return false;
+                }
+                return true;
+            }
+        }
   }
 
   QString XtalOpt::interpretTemplate(const QString & templateString,
@@ -1429,8 +1869,8 @@ namespace XtalOpt {
     for (int i = 0; i < structures->size(); i++) {
       xtal = qobject_cast<Xtal*>(structures->at(i));
       xtal->lock()->lockForWrite();
-      if (xtal->getStatus() == Xtal::Duplicate)
-        xtal->setStatus(Xtal::Optimized);
+      //if (xtal->getStatus() == Xtal::Duplicate)
+        //xtal->setStatus(Xtal::Optimized);
       xtal->structureChanged(); // Reset cached comparisons
       xtal->lock()->unlock();
     }

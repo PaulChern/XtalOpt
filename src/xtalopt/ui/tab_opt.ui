@@ -35,10 +35,7 @@
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Number of initial structures / number of structures to keep in queue for continuous mode.
-
-Default: 20
-</string>
+         <string>Number of initial structures / number of structures to keep in queue for continuous mode. Default: 20</string>
         </property>
         <property name="text">
          <string>Initial structures:</string>
@@ -57,8 +54,7 @@ Default: 20
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Number of initial structures to use in first generation.
-</string>
+         <string>Number of initial structures to use in first generation.</string>
         </property>
         <property name="maximum">
          <number>9999</number>
@@ -68,7 +64,18 @@ Default: 20
         </property>
        </widget>
       </item>
-      <item row="1" column="0" colspan="2">
+      <?ZF?>
+      <item row="1" column="0" colspan="1">
+       <widget class="QCheckBox" name="cb_cellDivide">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>Use Cell Divison Generation</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0" colspan="2">
        <widget class="QGroupBox" name="groupBox_2">
         <property name="title">
          <string>Initial Seed Structures:</string>
@@ -288,8 +295,22 @@ is a good value here.</string>
          </widget>
         </item>
        </layout>
-      </item>
+        </item>
       <item row="5" column="0">
+        <widget class="QLabel" name="label_12">
+            <property name="text">
+                <string>Final number of structures:</string>
+            </property>
+        </widget>
+      </item>
+      <item row="5" column="1">
+        <widget class="QSpinBox" name="spin_cutoff">
+            <property name="maximum">
+                <number>10000</number>
+            </property>
+        </widget>
+      </item>
+      <item row="6" column="0">
        <spacer name="verticalSpacer">
         <property name="orientation">
          <enum>Qt::Vertical</enum>
@@ -297,7 +318,7 @@ is a good value here.</string>
         <property name="sizeHint" stdset="0">
          <size>
           <width>20</width>
-          <height>40</height>
+          <height>30</height>
          </size>
         </property>
        </spacer>
@@ -761,10 +782,10 @@ Default: 0.5</string>
             <string> Å</string>
            </property>
            <property name="decimals">
-            <number>3</number>
+            <number>6</number>
            </property>
            <property name="singleStep">
-            <double>0.005000000000000</double>
+            <double>0.000500000000000</double>
            </property>
           </widget>
          </item>

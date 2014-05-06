@@ -30,7 +30,7 @@ class QFile;
 
 namespace XtalOpt {
   class XtalCompositionStruct;
-
+  class IAD;
   class Xtal : public GlobalSearch::Structure
   {
     Q_OBJECT
@@ -69,16 +69,42 @@ namespace XtalOpt {
     bool checkInteratomicDistances(const QHash<unsigned int, XtalCompositionStruct> &limits,
                                    int *atom1 = NULL, int *atom2 = NULL,
                                    double *IAD = NULL);
+    // ZF   
+    bool checkMinIAD(const QHash<QPair<int, int>, IAD> &limits,
+                                   int *atom1 = NULL, int *atom2 = NULL,
+                                   double *IAD = NULL);
+    bool addAtomRandomlyIAD(unsigned int atomicNumber,
+                         const QHash<unsigned int, XtalCompositionStruct> & limits,
+                         const QHash<QPair<int, int>, IAD> &limitsIAD,
+                         double maxRad = 3.0,
+                         int maxAttempts = 100.0,
+                         Avogadro::Atom **atom = 0);
+    bool moveAtomRandomlyIAD(unsigned int atomicNumber,
+                         const QHash<unsigned int, XtalCompositionStruct> & limits,
+                         const QHash<QPair<int, int>, IAD> &limitsIAD,
+                         double maxRad = 3.0,
+                         int maxAttempts = 100.0,
+                         Avogadro::Atom **atom = 0);
+
+    bool fillSuperCell(int a, int b, int c, Xtal * myXtal);
+
+    // Use the minIAD constraints in @a limitsIAD to check the interatomic
+    // distances in the xtal. atom1 and atom2 are overwritten with the indexes
+    // of the first set of offending atom, if any, that are found. The bad IAD
+    // is written to IAD if a double pointer is provided.
+    //
+    
     QHash<QString, QVariant> getFingerprint();
     virtual QString getResultsEntry() const;
     virtual QString getResultsHeader() const {
-      return QString("%1 %2 %3 %4 %5 %6")
+      return QString("%1 %2 %3 %4 %5 %6 %7")
         .arg("Rank", 6)
         .arg("Gen", 6)
         .arg("ID", 6)
+        .arg("Volume", 10)
         .arg("Enthalpy", 10)
         .arg("SpaceGroup", 10)
-        .arg("Status", 11);};
+        .arg("Status", 20);};
 
     // Cell paramters
     double getA()       const {return cell()->GetA();};

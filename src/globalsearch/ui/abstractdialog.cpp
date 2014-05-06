@@ -81,10 +81,10 @@ namespace GlobalSearch {
             this, SLOT(updateGUI()));
     connect(m_opt, SIGNAL(readOnlySessionStarted()),
             this, SLOT(lockGUI()));
-    connect(m_opt->queue(), SIGNAL(newStatusOverview(int,int,int)),
-            this, SLOT(updateStatus(int,int,int)));
-    connect(this, SIGNAL(sig_updateStatus(int,int,int)),
-            this, SLOT(updateStatus_(int,int,int)));
+    connect(m_opt->queue(), SIGNAL(newStatusOverview(int,int,int,int)),
+            this, SLOT(updateStatus(int,int,int,int)));
+    connect(this, SIGNAL(sig_updateStatus(int,int,int,int)),
+            this, SLOT(updateStatus_(int,int,int,int)));
 
     connect(progTimer, SIGNAL(timeout()),
             this, SLOT(repaintProgressBar_()),
@@ -214,8 +214,9 @@ namespace GlobalSearch {
       m_opt->emitSessionStarted();
   }
 
-  void AbstractDialog::updateStatus_(int opt, int run, int fail) {
+  void AbstractDialog::updateStatus_(int opt, int iad, int run, int fail) {
     ui_label_opt->setText(QString::number(opt));
+    ui_label_iad->setText(QString::number(iad));
     ui_label_run->setText(QString::number(run));
     ui_label_fail->setText(QString::number(fail));
   }

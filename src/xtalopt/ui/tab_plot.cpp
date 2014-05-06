@@ -36,12 +36,16 @@ namespace XtalOpt {
   TabPlot::TabPlot( XtalOptDialog *parent, XtalOpt *p ) :
     AbstractTab(parent, p),
     m_plot_mutex(new QReadWriteLock()),
-    m_plotObject(0)
+    m_plotObject(0),
+    z_plotObject(0),
+    d_plotObject(0)
   {
     ui.setupUi(m_tab_widget);
-
+    //m_tab_widget->setStyleSheet("background-color: white;");
     // Plot setup
     ui.plot_plot->setAntialiasing(true);
+    ui.plot_plot->setBackgroundColor(Qt::white);
+    ui.plot_plot->setForegroundColor(Qt::black);
     updatePlot();
 
     // dialog connections
@@ -74,6 +78,8 @@ namespace XtalOpt {
     connect(ui.cb_showDuplicates, SIGNAL(toggled(bool)),
             this, SLOT(updatePlot()));
     connect(ui.cb_showIncompletes, SIGNAL(toggled(bool)),
+            this, SLOT(updatePlot()));
+    connect(ui.cb_showIAD, SIGNAL(toggled(bool)),
             this, SLOT(updatePlot()));
     connect(ui.plot_plot, SIGNAL(pointClicked(double, double)),
             this, SLOT(selectMoleculeFromPlot(double, double)));
@@ -109,6 +115,7 @@ namespace XtalOpt {
     settings->setValue("y_label",         ui.combo_yAxis->currentIndex());
     settings->setValue("showDuplicates",  ui.cb_showDuplicates->isChecked());
     settings->setValue("showIncompletes", ui.cb_showIncompletes->isChecked());
+    settings->setValue("showIAD",         ui.cb_showIAD->isChecked());
     settings->setValue("labelPoints",     ui.cb_labelPoints->isChecked());
     settings->setValue("labelType",       ui.combo_labelType->currentIndex());
     settings->setValue("plotType",        ui.combo_plotType->currentIndex());
@@ -126,6 +133,7 @@ namespace XtalOpt {
     ui.combo_yAxis->setCurrentIndex( settings->value("y_label", Enthalpy_T).toInt());
     ui.cb_showDuplicates->setChecked( settings->value("showDuplicates", false).toBool());
     ui.cb_showIncompletes->setChecked( settings->value("showIncompletes", false).toBool());
+    ui.cb_showIAD->setChecked( settings->value("showIAD", false).toBool());
     ui.cb_labelPoints->setChecked( settings->value("labelPoints", false).toBool());
     ui.combo_labelType->setCurrentIndex( settings->value("labelType", Symbol_L).toInt());
     ui.combo_plotType->setCurrentIndex( settings->value("plotType", Trend_PT).toInt());
@@ -166,6 +174,7 @@ namespace XtalOpt {
     ui.combo_labelType->disconnect();
     ui.cb_showDuplicates->disconnect();
     ui.cb_showIncompletes->disconnect();
+    ui.cb_showIAD->disconnect();
     ui.plot_plot->disconnect();
     this->disconnect();
     disconnect(m_dialog, 0, this, 0);
@@ -235,6 +244,10 @@ namespace XtalOpt {
 
     m_plotObject = new PlotObject (Qt::red, PlotObject::Points, 4, PlotObject::Triangle);
 
+    // ZF
+    z_plotObject = new PlotObject (Qt::magenta, PlotObject::Points, 4, PlotObject::Circle);
+    d_plotObject = new PlotObject (Qt::darkGreen, PlotObject::Points, 4, PlotObject::Square);
+    
     double x, y;
     int ind;
     Xtal* xtal;
@@ -242,10 +255,11 @@ namespace XtalOpt {
     // Load config settings:
     bool labelPoints		= ui.cb_labelPoints->isChecked();
     bool showDuplicates		= ui.cb_showDuplicates->isChecked();
-    bool showIncompletes        = ui.cb_showIncompletes->isChecked();
+    bool showIncompletes    = ui.cb_showIncompletes->isChecked();
+    bool showIAD            = ui.cb_showIAD->isChecked();
     LabelTypes labelType	= LabelTypes(ui.combo_labelType->currentIndex());
-    PlotAxes xAxis		= PlotAxes(ui.combo_xAxis->currentIndex());
-    PlotAxes yAxis              = PlotAxes(ui.combo_yAxis->currentIndex());
+    PlotAxes xAxis		    = PlotAxes(ui.combo_xAxis->currentIndex());
+    PlotAxes yAxis          = PlotAxes(ui.combo_yAxis->currentIndex());
 
     // For minimum-energy traces
     double minE = DBL_MAX;
@@ -254,7 +268,7 @@ namespace XtalOpt {
     if (xAxis == Structure_T &&
         (yAxis == Energy_T ||
          yAxis == Enthalpy_T)) {
-      traceObject = new PlotObject(Qt::gray, PlotObject::Lines, 1);
+      traceObject = new PlotObject(Qt::darkGray, PlotObject::Lines, 1);
     }
 
     const QList<Structure*> structures (*m_opt->tracker()->list());
@@ -268,9 +282,14 @@ namespace XtalOpt {
       QReadLocker xtalLocker (xtal->lock());
       // Don't plot removed structures or those who have not completed their first INCAR.
       if ((xtal->getStatus() != Xtal::Optimized && !showIncompletes)) {
-        if  (!(xtal->getStatus() == Xtal::Duplicate && showDuplicates)) {
+        if  (!(xtal->getStatus() == Xtal::Duplicate && showDuplicates) && !(xtal->getStatus() == Xtal::InteratomicDist && showIAD)) {
           continue;
         }
+      }
+
+      // ZF
+      if  (xtal->getStatus() == Xtal::InteratomicDist && !showIAD) {
+        continue;
       }
 
       if  (xtal->getStatus() == Xtal::Duplicate && !showDuplicates) {
@@ -393,7 +412,15 @@ namespace XtalOpt {
       if (traceObject) {
         lastGoodTraceIndex = traceObject->points().size() - 1;
       }
-      pp = m_plotObject->addPoint(x,y);
+      
+      // ZF
+      if (xtal->getStatus() == Xtal::InteratomicDist) {
+          pp = z_plotObject->addPoint(x,y);
+      } else if (xtal->getStatus() == Xtal::Duplicate) {
+          pp = d_plotObject->addPoint(x,y);
+      } else {
+          pp = m_plotObject->addPoint(x,y);
+      }
       // Store index for later lookup
       pp->setCustomData(i);
       // Set point label if requested
@@ -523,9 +550,13 @@ namespace XtalOpt {
         break;
       }
     }
-
-    ui.plot_plot->addPlotObject(m_plotObject);
-    if (traceObject) {
+    
+    // ZF
+        ui.plot_plot->addPlotObject(z_plotObject);
+        ui.plot_plot->addPlotObject(m_plotObject);
+        ui.plot_plot->addPlotObject(d_plotObject);
+      
+      if (traceObject) {
       int numPoints = traceObject->points().size();
       for (int i = numPoints - 1;
            (i > lastGoodTraceIndex && i >= 0); --i) {
@@ -551,7 +582,43 @@ namespace XtalOpt {
                               oldDataRect.top(), // These are backwards from intuition,
                               oldDataRect.bottom()); // but that's how Qt works...
     }
-  }
+  
+    // Do not scale if z_plotObject is empty.
+    // If we have one point, set limits to something appropriate:
+    if (z_plotObject->points().size() == 1) {
+      double x = z_plotObject->points().at(0)->x();
+      double y = z_plotObject->points().at(0)->y();
+      ui.plot_plot->setDefaultLimits(x-1, x+1, y+1, y-1);
+    }
+    // For multiple points, let plotwidget handle it.
+    else if (z_plotObject->points().size() >= 2) {
+      // run scaleLimits to set the default limits, but then set the
+      // limits to the previous region
+      ui.plot_plot->scaleLimits();
+      ui.plot_plot->setLimits(oldDataRect.left(),
+                              oldDataRect.right(),
+                              oldDataRect.top(), // These are backwards from intuition,
+                              oldDataRect.bottom()); // but that's how Qt works...
+    }
+    
+    // Do not scale if d_plotObject is empty.
+    // If we have one point, set limits to something appropriate:
+    if (d_plotObject->points().size() == 1) {
+      double x = d_plotObject->points().at(0)->x();
+      double y = d_plotObject->points().at(0)->y();
+      ui.plot_plot->setDefaultLimits(x-1, x+1, y+1, y-1);
+    }
+    // For multiple points, let plotwidget handle it.
+    else if (d_plotObject->points().size() >= 2) {
+      // run scaleLimits to set the default limits, but then set the
+      // limits to the previous region
+      ui.plot_plot->scaleLimits();
+      ui.plot_plot->setLimits(oldDataRect.left(),
+                              oldDataRect.right(),
+                              oldDataRect.top(), // These are backwards from intuition,
+                              oldDataRect.bottom()); // but that's how Qt works...
+    }
+ }
 
   void TabPlot::plotDistHist()
   {
@@ -560,6 +627,7 @@ namespace XtalOpt {
 
     // Initialize vars
     m_plotObject = new PlotObject (Qt::red, PlotObject::Bars);
+    z_plotObject = new PlotObject (Qt::magenta, PlotObject::Bars);
     double x, y;
     PlotPoint *pp;
     QList<double> d, f, f_temp;
@@ -602,13 +670,22 @@ namespace XtalOpt {
     for (int i = 0; i < d.size(); i++) {
       x = d.at(i);
       y = f.at(i);
-      pp = m_plotObject->addPoint(x,y);
+      // ZF
+      if (xtal->getStatus() == Xtal::InteratomicDist) {
+        pp = z_plotObject->addPoint(x,y);
+      } else {
+        pp = m_plotObject->addPoint(x,y);
+      }
     }
 
     ui.plot_plot->axis(PlotWidget::BottomAxis)->setLabel(tr("Distance"));
     ui.plot_plot->axis(PlotWidget::LeftAxis)->setLabel(tr("Count"));
 
-    ui.plot_plot->addPlotObject(m_plotObject);
+      if (xtal->getStatus() == Xtal::InteratomicDist) {
+        ui.plot_plot->addPlotObject(z_plotObject);
+      } else {
+        ui.plot_plot->addPlotObject(m_plotObject);
+      }
 
     // Set default limits
     ui.plot_plot->scaleLimits();
@@ -656,7 +733,10 @@ namespace XtalOpt {
       case Xtal::Duplicate:
         s.append(" (d)");
         break;
-      default: break;
+      case Xtal::InteratomicDist:
+        s.append(" (i)");
+        break;
+     default: break;
       }
       ui.combo_distHistXtal->addItem(s);
     }
@@ -686,6 +766,31 @@ namespace XtalOpt {
         distance = cur;
       }
     }
+    //ZF
+    foreach ( PlotPoint *pp, z_plotObject->points() ) {
+      refPt = ui.plot_plot->mapToWidget(pp->position()).toPoint();
+      dx = refPt.x() - cx;
+      dy = refPt.y() - cy;
+      // Squared distance. Don't bother with sqrts here:
+      cur = dx*dx + dy*dy;
+      if ( cur < distance ) {
+        pt = pp;
+        distance = cur;
+      }
+    }
+
+    foreach ( PlotPoint *pp, d_plotObject->points() ) {
+      refPt = ui.plot_plot->mapToWidget(pp->position()).toPoint();
+      dx = refPt.x() - cx;
+      dy = refPt.y() - cy;
+      // Squared distance. Don't bother with sqrts here:
+      cur = dx*dx + dy*dy;
+      if ( cur < distance ) {
+        pt = pp;
+        distance = cur;
+      }
+    }
+
     selectMoleculeFromPlot(pt);
   }
 
@@ -713,7 +818,7 @@ namespace XtalOpt {
     Xtal *xtal = qobject_cast<Xtal*>(s);
 
     // Bail out if there is no plotobject in memory
-    if (!m_plotObject)
+    if (!m_plotObject && !z_plotObject)
       return;
     QReadLocker plotLocker (m_plot_mutex);
     xtal->lock()->lockForRead();
@@ -738,7 +843,30 @@ namespace XtalOpt {
     if (ui.combo_plotType->currentIndex() == Trend_PT) {
       PlotPoint* pp;
       bool found = false;
-      QList<PlotPoint*> *points = new QList<PlotPoint*>(m_plotObject->points());
+  // ZF
+      if (xtal->getStatus() == Xtal::InteratomicDist) {
+        QList<PlotPoint*> *points = new QList<PlotPoint*>(z_plotObject->points());
+
+        for (int i = 0; i < points->size(); i++) {
+        pp = points->at(i);
+        if (pp->customData().toInt() == ind) {
+          ui.plot_plot->blockSignals(true);
+          ui.plot_plot->clearAndSelectPoint(pp);
+          ui.plot_plot->blockSignals(false);
+          found = true;
+          break;
+        }
+      }
+      delete points;
+      if (!found) {
+        // If not found, clear selection
+        ui.plot_plot->blockSignals(true);
+        ui.plot_plot->clearSelection();
+        ui.plot_plot->blockSignals(false);
+      }
+//
+      } else {
+        QList<PlotPoint*> *points = new QList<PlotPoint*>(m_plotObject->points());
       for (int i = 0; i < points->size(); i++) {
         pp = points->at(i);
         if (pp->customData().toInt() == ind) {
@@ -765,6 +893,7 @@ namespace XtalOpt {
     if (ui.combo_plotType->currentIndex() == DistHist_PT) {
       refreshPlot();
     }
+  }
   }
 }
 

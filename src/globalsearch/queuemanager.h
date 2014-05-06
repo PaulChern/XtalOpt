@@ -169,7 +169,7 @@ m_queue->unlockForNaming(newStructure);
      * for optimization)
      * @param failing Number of structures with a getFailCount() > 0
      */
-    void newStatusOverview(int optimized, int running, int failing);
+    void newStatusOverview(int optimized, int iad, int running, int failing);
 
     // Work around for Qt 4.6.3
 #if QT_VERSION == 0x040603
@@ -450,6 +450,9 @@ m_queue->unlockForNaming(newStructure);
      */
     void handleRestartStructure(Structure *s);
 
+
+    void handleInteratomicDistStructure(Structure *s);
+
     // These run in the background and are called by the above
     // functions via QtConcurrent::run.
     /// @cond
@@ -461,6 +464,7 @@ m_queue->unlockForNaming(newStructure);
     void handleKilledStructure_(Structure *s);
     void handleDuplicateStructure_(Structure *s);
     void handleRestartStructure_(Structure *s);
+    void handleInteratomicDistStructure_(Structure *s);
     /// @endcond
 
     // Other background handlers
@@ -487,6 +491,7 @@ m_queue->unlockForNaming(newStructure);
     Tracker m_newlyKilledTracker;
     Tracker m_newDuplicateTracker;
     Tracker m_restartTracker;
+    Tracker m_iadTracker;
     Tracker m_newSubmissionTracker;
     /// @endcond
 

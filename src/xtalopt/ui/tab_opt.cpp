@@ -38,6 +38,9 @@ namespace XtalOpt {
     // Initial generation
     connect(ui.spin_numInitial, SIGNAL(valueChanged(int)),
             this, SLOT(updateOptimizationInfo()));
+    //ZF
+    connect(ui.cb_cellDivide, SIGNAL(toggled(bool)),
+            this, SLOT(updateOptimizationInfo()));
     // Seeds
     connect(ui.push_addSeed, SIGNAL(clicked()),
             this, SLOT(addSeed()));
@@ -59,6 +62,9 @@ namespace XtalOpt {
             this, SLOT(updateOptimizationInfo()));
     connect(ui.combo_failAction, SIGNAL(currentIndexChanged(int)),
             this, SLOT(updateOptimizationInfo()));
+    connect(ui.spin_cutoff, SIGNAL(valueChanged(int)),
+            this, SLOT(updateOptimizationInfo()));
+
 
     // Duplicate tolerances
     connect(ui.spin_tol_xcLength, SIGNAL(editingFinished()),
@@ -123,9 +129,12 @@ namespace XtalOpt {
 
     // Initial generation
     settings->setValue("opt/numInitial",        xtalopt->numInitial);
+    //ZF
+    settings->setValue("using/cellDivide",        xtalopt->using_cellDivide);
 
     // Search parameters
     settings->setValue("opt/popSize",           xtalopt->popSize);
+    settings->setValue("opt/cutoff",                xtalopt->cutoff);
     settings->setValue("opt/contStructs",       xtalopt->contStructs);
     settings->setValue("opt/limitRunningJobs",  xtalopt->limitRunningJobs);
     settings->setValue("opt/runningJobLimit",   xtalopt->runningJobLimit);
@@ -171,9 +180,12 @@ namespace XtalOpt {
 
     // Initial generation
     ui.spin_numInitial->setValue(       settings->value("opt/numInitial",       20).toInt()     );
+    //ZF
+    ui.cb_cellDivide->setChecked(       settings->value("using/cellDivide",       1).toBool()     );
 
     // Search parameters
     ui.spin_popSize->setValue(          settings->value("opt/popSize",          20).toUInt()    );
+    ui.spin_cutoff->setValue(           settings->value("opt/cutoff",               100).toInt());
     ui.spin_contStructs->setValue(      settings->value("opt/contStructs",      10).toUInt()    );
     ui.cb_limitRunningJobs->setChecked( settings->value("opt/limitRunningJobs"  ,false).toBool());
     ui.spin_runningJobLimit->setValue(  settings->value("opt/runningJobLimit",  1).toUInt()    );
@@ -222,9 +234,12 @@ namespace XtalOpt {
 
     // Initial generation
     ui.spin_numInitial->setValue(       xtalopt->numInitial);
+    //ZF
+    ui.cb_cellDivide->setChecked(         xtalopt->using_cellDivide);
 
     // Search parameters
     ui.spin_popSize->setValue(          xtalopt->popSize);
+    ui.spin_cutoff->setValue(           xtalopt->cutoff);
     ui.spin_contStructs->setValue(      xtalopt->contStructs);
     ui.cb_limitRunningJobs->setChecked( xtalopt->limitRunningJobs);
     ui.spin_runningJobLimit->setValue(  xtalopt->runningJobLimit);
@@ -259,7 +274,6 @@ namespace XtalOpt {
   {
     ui.spin_numInitial->setDisabled(true);
     ui.list_seeds->setDisabled(true);
-    ui.push_addSeed->setDisabled(true);
     ui.push_addSeed->setDisabled(true);
     ui.push_removeSeed->setDisabled(true);
   }
@@ -296,9 +310,12 @@ namespace XtalOpt {
     xtalopt->numInitial           = ui.spin_numInitial->value();
     if (int(xtalopt->numInitial) < ui.list_seeds->count())
       ui.spin_numInitial->setValue(ui.list_seeds->count());
+    //ZF
+    xtalopt->using_cellDivide           = ui.cb_cellDivide->isChecked();
 
     // Search parameters
     xtalopt->popSize              = ui.spin_popSize->value();
+    xtalopt->cutoff         = ui.spin_cutoff->value();
     xtalopt->contStructs          = ui.spin_contStructs->value();
     xtalopt->runningJobLimit	= ui.spin_runningJobLimit->value();
     xtalopt->limitRunningJobs	= ui.cb_limitRunningJobs->isChecked();

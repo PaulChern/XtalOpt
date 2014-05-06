@@ -35,6 +35,7 @@
 
 #include <QtCore/QFile>
 #include <QtCore/QThread>
+#include <QtCore/QDir>
 
 #include <QtGui/QClipboard>
 #include <QtGui/QMessageBox>

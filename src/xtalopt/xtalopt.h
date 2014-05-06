@@ -44,6 +44,13 @@ namespace XtalOpt {
     unsigned int quantity;
   };
 
+// ZF
+    struct IAD {
+        double minIAD;
+        double maxIAD;
+    };
+
+
   class XtalOpt : public GlobalSearch::OptBase
   {
     Q_OBJECT
@@ -85,6 +92,11 @@ namespace XtalOpt {
                                                   const QString &reason = "");
     bool checkLimits();
     bool checkXtal(Xtal *xtal, QString * err = NULL);
+    bool checkStepOptimizedStructure(GlobalSearch::Structure *s, QString *err = NULL);
+    //ZF
+    bool checkCount(Xtal *xtal, QString * err = NULL);     
+
+
     QString interpretTemplate(const QString & templateString, GlobalSearch::Structure* structure);
     QString getTemplateKeywordHelp();
     bool load(const QString & filename, const bool forceReadOnly = false);
@@ -125,6 +137,13 @@ namespace XtalOpt {
 
     bool using_fixed_volume;
     bool using_interatomicDistanceLimit;
+// ZF
+    bool using_customIAD;
+    bool using_checkStepOpt;
+    double maxRadius;
+    QHash<QPair<int, int>, IAD> interComp;
+    bool using_cellDivide;
+    
 
     QHash<uint, XtalCompositionStruct> comp;
     QStringList seedList;

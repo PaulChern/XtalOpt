@@ -511,7 +511,10 @@ able to create offspring that meet this restriction.</string>
        <layout class="QHBoxLayout" name="horizontalLayout">
         <item>
          <widget class="QCheckBox" name="cb_interatomicDistanceLimit">
-          <property name="toolTip">
+           <property name="enabled">
+           <bool>true</bool>
+          </property>
+         <property name="toolTip">
            <string>Use this to limit the shortest interatomic distance between atoms. This ensures that atoms aren't overlapping.</string>
           </property>
           <property name="text">
@@ -595,6 +598,95 @@ able to create offspring that meet this restriction.</string>
          <double>0.250000000000000</double>
         </property>
        </widget>
+   </item>
+   <item row="15" column="0" colspan="1">
+       <widget class="QCheckBox" name="cb_customIAD">
+           <property name="enabled">
+           <bool>true</bool>
+          </property>
+       <property name="text">
+            <string>Use Custom Interatomic Distances</string>
+        </property>
+       </widget>
+   </item>
+      <item row="14" column="0" colspan="1">
+       <widget class="QCheckBox" name="cb_checkStepOpt">
+           <property name="enabled">
+           <bool>true</bool>
+          </property>
+       <property name="text">
+            <string>Step Check</string>
+        </property>
+       </widget>
+      </item>
+      <item row="16" column="0" colspan="1">
+       <widget class="QLabel" name="label_69">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string>Maximum radius (Å):</string>
+        </property>
+        <property name="buddy">
+         <cstring>spin_maxRadius</cstring>
+        </property>
+       </widget>
+      </item>
+      <item row="16" column="1">
+       <widget class="QDoubleSpinBox" name="spin_maxRadius">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+        <property name="suffix">
+         <string> Å</string>
+        </property>
+        <property name="decimals">
+         <number>2</number>
+        </property>
+        <property name="singleStep">
+         <double>0.050000000000000</double>
+        </property>
+        <property name="value">
+         <double>3.0000000000000</double>
+        </property>
+       </widget>
+      </item>
+
+   <item row="17" column="0" colspan="4">
+        <widget class="QTableWidget" name="table_IAD">
+        <property name="sortingEnabled">
+         <bool>true</bool>
+        </property>
+        <property name="editTriggers">
+         <set>QAbstractItemView::DoubleClicked</set>
+        </property>
+        <attribute name="horizontalHeaderMinimumSectionSize">
+         <number>9</number>
+        </attribute>
+        <attribute name="horizontalHeaderStretchLastSection">
+         <bool>true</bool>
+        </attribute>
+        <column>
+            <property name="text">
+                <string>Atom 1</string>
+            </property>
+        </column>
+        <column>
+            <property name="text">
+                <string>Atom 2</string>
+            </property>
+        </column>
+        <column>
+            <property name="text">
+                <string>Min. IAD</string>
+            </property>
+        </column>
+         <column>
+            <property name="text">
+                <string>Max. IAD</string>
+            </property>
+        </column>
+      </widget>
       </item>
      </layout>
     </widget>
@@ -623,25 +715,11 @@ able to create offspring that meet this restriction.</string>
   <tabstop>spin_scaleFactor</tabstop>
   <tabstop>spin_minRadius</tabstop>
   <tabstop>table_comp</tabstop>
+  <tabstop>table_IAD</tabstop>
+  <tabstop>cb_customIAD</tabstop>
  </tabstops>
  <resources/>
  <connections>
-  <connection>
-   <sender>cb_interatomicDistanceLimit</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>spin_scaleFactor</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>647</x>
-     <y>282</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>908</x>
-     <y>282</y>
-    </hint>
-   </hints>
-  </connection>
   <connection>
    <sender>cb_fixedVolume</sender>
    <signal>toggled(bool)</signal>
@@ -706,7 +784,23 @@ able to create offspring that meet this restriction.</string>
     </hint>
    </hints>
   </connection>
-  <connection>
+   <connection>
+   <sender>cb_interatomicDistanceLimit</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>spin_scaleFactor</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>647</x>
+     <y>282</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>908</x>
+     <y>282</y>
+    </hint>
+   </hints>
+  </connection>
+ <connection>
    <sender>cb_interatomicDistanceLimit</sender>
    <signal>toggled(bool)</signal>
    <receiver>label</receiver>
@@ -754,5 +848,53 @@ able to create offspring that meet this restriction.</string>
     </hint>
    </hints>
   </connection>
- </connections>
+   <connection>
+   <sender>cb_interatomicDistanceLimit</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cb_customIAD</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>511</x>
+     <y>277</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>846</x>
+     <y>301</y>
+    </hint>
+   </hints>
+  </connection>
+   <connection>
+   <sender>cb_customIAD</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>table_IAD</receiver>
+   <slot>setEnabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>511</x>
+     <y>277</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>846</x>
+     <y>301</y>
+    </hint>
+   </hints>
+  </connection>
+ <connection>
+   <sender>cb_customIAD</sender>
+   <signal>toggled(bool)</signal>
+   <receiver>cb_interatomicDistanceLimit</receiver>
+   <slot>setDisabled(bool)</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>511</x>
+     <y>277</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>846</x>
+     <y>301</y>
+    </hint>
+   </hints>
+  </connection>
+</connections>
 </ui>

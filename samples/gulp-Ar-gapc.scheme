@@ -15,3 +15,6 @@ edit\remote\rempath=
 edit\optimizer=gulp
 edit\queueInterface=local
 optimizer\GULP\job.gin_list=opti conj conp\nswitch_minimiser bfgs gnorm 0.01\nmaxcyc 10000\ncart\n%coords%\nlennard epsilon 12 6\nAr Ar 1 1 15\n
+
+[xtalopt]
+optimizer\VASP\QI\PBS\job.pbs_list=

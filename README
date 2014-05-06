@@ -7,9 +7,13 @@ to the Avogadro molecular editor and licensed under the GPL v2 or later.
 
 More information can be found at http://xtalopt.openmolecules.net.
 
+
+
 Installation
 ============
 
+FOR ARCHLINUX...
+++++++++++++++++++++++++++++++++++++++++
 An up-to-date copy of the installation instructions is maintained at:
 
 http://xtalopt.openmolecules.net/wiki/index.fcgi/wiki/Installation
@@ -17,6 +21,77 @@ http://xtalopt.openmolecules.net/wiki/index.fcgi/wiki/Installation
 There is also a tutorial available at:
 
 http://xtalopt.openmolecules.net/globalsearch/docs/tut-xo.html
+
+
+FOR UBUNTU 12.04 OR LATER...
+++++++++++++++++++++++++++++++++++++++++
+    
+    sudo apt-get install -f build-essential cmake doxygen git libcairo2 libwxgtk2.8-0 libxml2 libeigen* libqt4* qt4* openssh* ssh subversion wx-common zlib1g
+
+    mkdir ~/src
+
+    cd ~/src
+
+OpenBabel
+---------
+    git clone https://github.com/zfalls/OpenBabel.git openbabel
+
+    mkdir openbabel/build
+    cd openbabel/build
+
+    cmake .. -DCMAKE_INSTALL_PREFIX=$HOME -DBUILD_GUI=FALSE
+
+    make -j3
+
+    sudo make install
+
+Avogadro
+--------
+    cd ~/src
+
+    git clone https://github.com/zfalls/Avogadro.git avogadro
+
+    mkdir avogadro/build
+
+    cd  avogadro/build
+
+    cmake .. -DOPENBABEL2_INCLUDE_DIR=$HOME/include/openbabel-2.0 -DOPENBABEL2_LIBRARIES=$HOME/lib/libopenbabel.so -DENABLE_PYTHON=false -DCMAKE_INSTALL_PREFIX=$HOME
+
+    make -j3
+
+    sudo make install
+
+XtalOpt
+-------
+    cd ~/src
+
+    git clone -b master https://github.com/zfalls/XtalOpt.git xtalopt
+
+    mkdir xtalopt/build
+
+    cd xtalopt/build
+
+    cmake .. -DOPENBABEL2_INCLUDE_DIR=$HOME/include/openbabel-2.0 -DOPENBABEL2_LIBRARIES=$HOME/lib/libopenbabel.so -DCMAKE_INSTALL_PREFIX=$HOME ***
+
+        ***Options***
+            
+            -DENABLE_RANDOMDOCK=1
+
+            -DENABLE_GAPC=1
+
+    make -j3
+
+    sudo make install
+
+
+EVRYTHING SHOULD BE READY TO GO!!!
+    As long as $HOME/bin is in your $PATH, you can run avogadro by typing
+
+        avogadro &
+
+    in the command line
+
+
 
 License
 =======
